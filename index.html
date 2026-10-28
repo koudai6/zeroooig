@@ -357,7 +357,7 @@ header{display:flex;align-items:center;gap:6px;padding:6px 8px 8px 2px;backgroun
 #chat{padding:8px 8px 14px}
 .bar{width:100%;min-width:0;padding:6px 8px calc(8px + var(--sab,env(safe-area-inset-bottom)));gap:8px;align-items:flex-end}
 .field{min-width:0}
-.field textarea{min-width:0;flex:1}.field.recording{outline:2px solid #e5484d}.voice-bub{display:flex;flex-direction:column;gap:5px;min-width:150px}.voice-play{border:0;background:none;color:inherit;display:flex;align-items:center;gap:8px;padding:2px;font:inherit;text-align:left}.voice-wave{font-size:18px;letter-spacing:2px}.voice-txt{font-size:13px;opacity:.8;border-top:1px solid rgba(128,128,128,.25);padding-top:5px}
+.field textarea{min-width:0;flex:1}.field{position:relative}.field.recording{outline:2px solid #e5484d;animation:recordRing 1s ease-in-out infinite}.field.recording textarea{color:transparent!important}.field.recording::after{content:"●  ▂ ▄ ▆ ▇ ▅ ▃";position:absolute;left:16px;top:50%;transform:translateY(-50%);color:#e5484d;font-size:16px;letter-spacing:2px;pointer-events:none;animation:recordWave .65s ease-in-out infinite alternate}.field.recording textarea::placeholder{color:transparent}@keyframes recordRing{0%,100%{outline-color:rgba(229,72,77,.35)}50%{outline-color:rgba(229,72,77,1)}}@keyframes recordWave{from{opacity:.45;transform:translateY(-50%) scaleY(.8)}to{opacity:1;transform:translateY(-50%) scaleY(1.12)}}.voice-bub{display:flex;flex-direction:column;gap:5px;min-width:150px}.voice-play{border:0;background:none;color:inherit;display:flex;align-items:center;gap:8px;padding:2px;font:inherit;text-align:left}.voice-wave{font-size:18px;letter-spacing:2px}.voice-txt{font-size:13px;opacity:.8;border-top:1px solid rgba(128,128,128,.25);padding-top:5px}
 .sendc{flex:0 0 42px;min-width:42px;min-height:42px}
 @media(max-width:380px){.bar{gap:6px;padding-left:7px;padding-right:7px}.plus{width:40px;height:42px}.sendc{flex-basis:40px;min-width:40px;width:40px;height:42px}.act{width:32px}.field textarea{padding-left:11px}}
 .plus{border:0;background:var(--bg);box-shadow:0 1px 2px rgba(0,0,0,.12);color:var(--ink)}
@@ -1131,7 +1131,7 @@ header{padding-right:10px!important}
   <footer class="bar">
     <button class="plus" id="plus" aria-label="更多功能"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6l6 6-6 6M12 6l6 6-6 6"/></svg></button>
     <div class="field">
-      <textarea id="ta" rows="1" placeholder="输入消息（长按可录语音）" enterkeyhint="send"></textarea>
+      <textarea id="ta" rows="1" placeholder="输入消息" enterkeyhint="send"></textarea>
       <button class="act" id="stk" aria-label="表情包"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#8e8e93" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 0-8 8c4.4 0 8-3.6 8-8z"/><path d="M20 12h-4a4 4 0 0 0-4 4v4"/><path d="M9 10h.01M15 10h.01"/></svg></button>
       <button class="act" id="cam" aria-label="图片"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#8e8e93" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.6-2.4h6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.6"/></svg></button>
     </div>
@@ -1306,7 +1306,7 @@ function render(keep){
     const first=dayNew||!p||p.type==='pat'||p.type==='call'||p.mine!==m.mine;
     const r=h('div','r '+(m.mine?'mine':'theirs')+(first?' first':''));r.dataset.id=m.id;
     const e=document.createElement('div');
-    if(m.type==='voice'){e.className='m voice';const box=h('div','voice-bub'),play=h('button','voice-play');play.innerHTML='<span class="voice-wave">◖)))</span><span>'+(m.duration||1)+'″ 语音</span>';play.onclick=()=>{const au=new Audio(m.audio);au.play().catch(()=>toast('无法播放语音'))};box.append(play);if(m.transcript)box.append(h('div','voice-txt','转文字：'+m.transcript));e.append(box,metaEl(m));}
+    if(m.type==='voice'){e.className='m voice';const box=h('div','voice-bub'),play=h('button','voice-play');play.innerHTML='<span class="voice-wave">◖)))</span><span>'+(m.duration||1)+'″ 语音</span>';play.onclick=()=>{try{if(window.__zkVoicePlayer){window.__zkVoicePlayer.pause();window.__zkVoicePlayer.currentTime=0}const au=new Audio(m.audio);au.loop=false;au.autoplay=false;window.__zkVoicePlayer=au;au.play().catch(()=>toast('无法播放语音'))}catch(err){toast('无法播放语音')}};box.append(play);if(m.transcript)box.append(h('div','voice-txt','转文字：'+m.transcript));e.append(box,metaEl(m));}
      else if(m.type==='transfer'||m.type==='redpacket')payCard(m,e);
     else if(m.type==='poll')pollCard(m,e);
     else if(m.type==='image'){
@@ -1351,26 +1351,35 @@ ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposin
 
 $('send').onclick=send;
 
-/* 长按输入框录制我方语音；支持时同步语音识别并在气泡中附带转写 */
-let rec=null,recChunks=[],recTimer=null,recStarted=false,recStartAt=0,speech=null,speechText='',pressX=0,pressY=0;
+/* 长按输入框录制我方语音；录音动画、独立录音缓存，避免跨次录音串音 */
+let rec=null,recTimer=null,recStarted=false,recStartAt=0,speech=null,pressX=0,pressY=0;
 async function startVoice(){
   if(recStarted)return;
   if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){toast('当前浏览器不支持语音录制，请使用 HTTPS 的 Safari');return}
   try{
     const stream=await navigator.mediaDevices.getUserMedia({audio:true});
-    recChunks=[];recStarted=true;recStartAt=Date.now();speechText='';$('ta').blur();$('ta').placeholder='正在录音…松开发送';$('ta').closest('.field').classList.add('recording');
-    rec=new MediaRecorder(stream);rec.ondataavailable=e=>{if(e.data&&e.data.size)recChunks.push(e.data)};
-    rec.onstop=async()=>{
-      stream.getTracks().forEach(t=>t.stop());$('ta').placeholder='输入消息（长按可录语音）';$('ta').closest('.field').classList.remove('recording');
+    if(recStarted){stream.getTracks().forEach(t=>t.stop());return}
+    const chunks=[];let speechText='',finished=false;
+    recStarted=true;recStartAt=Date.now();$('ta').blur();$('ta').placeholder='';$('ta').closest('.field').classList.add('recording');
+    const preferred=['audio/mp4;codecs=mp4a.40.2','audio/mp4','audio/webm;codecs=opus','audio/webm'];
+    const mime=preferred.find(t=>window.MediaRecorder.isTypeSupported?.(t));
+    rec=mime?new MediaRecorder(stream,{mimeType:mime}):new MediaRecorder(stream);
+    const thisRec=rec;
+    thisRec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
+    thisRec.onstop=()=>{
+      if(finished)return;finished=true;
+      stream.getTracks().forEach(t=>t.stop());
+      $('ta').placeholder='输入消息';$('ta').closest('.field').classList.remove('recording');
       const duration=Math.max(1,Math.round((Date.now()-recStartAt)/1000));
-      if(!recChunks.length){toast('没有录到语音');return}
-      const blob=new Blob(recChunks,{type:rec.mimeType||'audio/webm'});
-      const reader=new FileReader();reader.onload=()=>{push({id:Date.now(),mine:true,type:'voice',audio:reader.result,duration,transcript:speechText.trim(),t:Date.now(),read:false});if(!speechText.trim())toast('语音已发送；当前浏览器未能自动转写')};reader.readAsDataURL(blob);
+      if(!chunks.length){toast('没有录到语音');return}
+      const blob=new Blob(chunks,{type:thisRec.mimeType||chunks[0].type||'audio/mp4'});
+      if(!blob.size){toast('没有录到语音');return}
+      const reader=new FileReader();reader.onload=()=>{if(typeof reader.result!=='string')return;push({id:Date.now(),mine:true,type:'voice',audio:reader.result,duration,transcript:speechText.trim(),t:Date.now(),read:false});if(!speechText.trim())toast('语音已发送；当前浏览器未能自动转写')};reader.readAsDataURL(blob);
     };
-    rec.start();
+    thisRec.start();
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-    if(SR){speech=new SR();speech.lang='zh-CN';speech.continuous=true;speech.interimResults=true;speech.onresult=e=>{let t='';for(let i=0;i<e.results.length;i++)t+=e.results[i][0].transcript;speechText=t};try{speech.start()}catch(e){}}
-  }catch(e){toast('无法使用麦克风，请检查权限并确保网站为 HTTPS')}
+    if(SR){try{speech=new SR();speech.lang='zh-CN';speech.continuous=true;speech.interimResults=false;speech.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal){const t=e.results[i][0]?.transcript?.trim();if(t&&!speechText.includes(t))speechText+=(speechText?'':'')+t;}}};speech.start()}catch(e){speech=null}}
+  }catch(e){recStarted=false;$('ta').placeholder='输入消息';$('ta').closest('.field').classList.remove('recording');toast('无法使用麦克风，请检查权限并确保网站为 HTTPS')}
 }
 function stopVoice(){
   clearTimeout(recTimer);if(!recStarted)return;recStarted=false;
@@ -1385,7 +1394,6 @@ ta.addEventListener('touchcancel',()=>{clearTimeout(recTimer);if(recStarted)stop
 ta.addEventListener('pointerdown',e=>{if(e.pointerType==='mouse')recTimer=setTimeout(startVoice,600)});
 ta.addEventListener('pointerup',()=>{clearTimeout(recTimer);if(recStarted)stopVoice()});
 ta.addEventListener('pointercancel',()=>{clearTimeout(recTimer);if(recStarted)stopVoice()});
-
 
 /* 设置 */
 $('more').onclick=()=>{$('fName').value=S.profile.name;$('fMy').value=S.profile.myName||'我';$('sheet').hidden=false};
@@ -3038,8 +3046,11 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 /* 启动：先读存档，再显示 */
 (async()=>{
   await kv.open();
-  const d=await kv.get('state');
-  let lite=null;try{lite=JSON.parse(localStorage.getItem('zk4_lite')||'null')}catch(e){}
+  // 用户要求每次进入网站都从零开始：清除旧存档，不读取上次的联系人、聊天、字卡和设置。
+  try{localStorage.removeItem('zk4_lite')}catch(e){}
+  if(kv.db){try{await new Promise(resolve=>{const tx=kv.db.transaction('kv','readwrite');tx.objectStore('kv').clear();tx.oncomplete=tx.onerror=tx.onabort=()=>resolve()})}catch(e){}}
+  const d=null;
+  let lite=null;
   if(d){
     if(Array.isArray(d.cards))G.cards=d.cards;
     if(Array.isArray(d.groups)&&d.groups.length)G.groups=d.groups;
