@@ -3122,7 +3122,69 @@ $('ltT').onclick=()=>{const s=sg();if(!s)return;let a,b2;
   .sendc, .sendc.hide { flex-basis: 36px !important; width: 36px !important; min-width: 36px !important; height: 36px !important; }
 }
 </style>
-\n</body>
+\n
+<style id="ios18-universal-keyboard-layout-v1">
+/* iOS 18：所有文字输入场景统一适配键盘可视区域（弹窗、底部面板、设置页等） */
+:root { --ios-kb-vh: 100dvh; --ios-kb-top: 0px; }
+.sheet, .sheet.mc { height: var(--ios-kb-vh) !important; max-height: var(--ios-kb-vh) !important; }
+.sheet { top: var(--ios-kb-top) !important; bottom: auto !important; }
+.sheet .panel { box-sizing: border-box; max-height: calc(var(--ios-kb-vh) - 12px) !important; min-height: 0; overflow-y: auto !important; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.sheet .panel .body, .sheet .panel .mBody, #mBody { min-height: 0; }
+.sheet .panel input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=color]):not([type=range]),
+.sheet .panel textarea, .sheet .panel select,
+input[type=text], input[type=search], input[type=email], input[type=url], input[type=tel], input[type=number], textarea, select {
+  scroll-margin-top: 16px; scroll-margin-bottom: 24px;
+}
+@media (display-mode: standalone) {
+  .sheet .panel { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+}
+</style>
+<script id="ios18-universal-input-viewport-v1">
+(()=>{
+  const vv=window.visualViewport;
+  const editable=e=>e && (e.tagName==='TEXTAREA' || e.tagName==='SELECT' || (e.tagName==='INPUT' && !/^(checkbox|radio|file|color|range|button|submit|reset|hidden)$/.test(e.type)));
+  let raf=0;
+  const updateViewport=()=>{
+    if(raf)return;
+    raf=requestAnimationFrame(()=>{
+      raf=0;
+      const keyboard=!!(vv && vv.height < window.innerHeight-60 && editable(document.activeElement));
+      const h=keyboard ? Math.max(220,Math.round(vv.height)) : Math.round(window.innerHeight);
+      document.documentElement.style.setProperty('--ios-kb-vh',h+'px');
+      document.documentElement.style.setProperty('--ios-kb-top',(keyboard?Math.max(0,Math.round(vv.offsetTop)):0)+'px');
+    });
+  };
+  const reveal=el=>{
+    if(!editable(el))return;
+    const panel=el.closest('.panel');
+    const sheet=el.closest('.sheet');
+    if(!panel && !sheet)return;
+    const run=()=>{
+      updateViewport();
+      const r=el.getBoundingClientRect();
+      const visibleBottom=vv?vv.offsetTop+vv.height:window.innerHeight;
+      const visibleTop=vv?vv.offsetTop:0;
+      if(r.bottom>visibleBottom-28 || r.top<visibleTop+8){
+        if(panel){
+          const pr=panel.getBoundingClientRect();
+          const delta=r.bottom>visibleBottom-28 ? r.bottom-(visibleBottom-28) : r.top-(visibleTop+8);
+          panel.scrollTop += delta;
+        } else {
+          try{el.scrollIntoView({block:'nearest',behavior:'auto'})}catch(_){ }
+        }
+      }
+    };
+    requestAnimationFrame(()=>{run();setTimeout(run,180);setTimeout(run,420)});
+  };
+  document.addEventListener('focusin',e=>{if(editable(e.target)){updateViewport();reveal(e.target)}});
+  document.addEventListener('focusout',()=>{setTimeout(updateViewport,120);setTimeout(updateViewport,350)});
+  if(vv){vv.addEventListener('resize',updateViewport);vv.addEventListener('scroll',updateViewport)}
+  window.addEventListener('resize',updateViewport);window.addEventListener('orientationchange',()=>setTimeout(updateViewport,250));
+  updateViewport();
+})();
+</script>
+
+</body>
 </html>
 
 <style>
@@ -3318,4 +3380,18 @@ html,body{overscroll-behavior:none}
  const vv=window.visualViewport;
  if(vv){let raf=0;const update=()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;if(document.activeElement===input&&window.relayout)window.relayout()})};vv.addEventListener('resize',update);vv.addEventListener('scroll',update)}
 })();
+
+
+<style id="zeroooig-chat-sticker-compact">
+/* 聊天消息中的表情包缩小显示；普通相册图片和表情包库不受影响 */
+#chat .r .m.pic.stk img,
+#chat .r .m.pic img.sticker{
+  display:block!important;
+  width:auto!important;
+  height:auto!important;
+  max-width:min(124px,40vw)!important;
+  max-height:124px!important;
+  object-fit:contain!important;
+}
+</style>
 </script>
