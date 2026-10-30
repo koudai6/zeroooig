@@ -115,7 +115,7 @@ input[type=checkbox]:checked::after{transform:translateX(18px)}
 .cd{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line)}
 .cd.dis .cd-main{opacity:.45}
 .cd-main{flex:1;min-width:0}.cd-t{font-size:15px;overflow-wrap:anywhere;white-space:pre-wrap}.cd-m{font-size:11px;color:var(--mute);margin-top:3px}
-.cd-img{width:56px;height:56px;border-radius:10px;object-fit:cover;display:block}
+.cd-img{width:auto;height:auto;max-width:80px;max-height:80px;border-radius:8px;object-fit:contain;background:#fff;display:block}
 .ck{flex:none;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line)}.cd.sel .ck{background:var(--blue);border-color:var(--blue)}
 .mini,.panel .mini{flex:none;border:0;border-radius:10px;padding:6px 10px;background:var(--gray);color:var(--ink);font:inherit;font-size:13px}
 .empty{text-align:center;color:var(--mute);padding:40px 0}
@@ -159,11 +159,12 @@ input[type=checkbox]:checked::after{transform:translateX(18px)}
 .pay-s{font-size:12px;opacity:.92;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pay-foot{font-size:11px;padding:6px 14px;background:none;border-top:1px solid rgba(255,255,255,.3);opacity:.92}
 /* 表情包 */
-.pic.stk img{max-height:140px;max-width:140px;border-radius:8px}
-.stk-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:auto;align-content:start;gap:10px;max-height:46vh;overflow-y:auto;flex:none;-webkit-overflow-scrolling:touch}
-.panel .stk-t{position:relative;display:block;width:100%;height:auto;min-height:0;padding:0;border-radius:12px;background:var(--gray);overflow:hidden}
-.stk-t::before{content:"";display:block;padding-top:100%}
-.stk-t img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block}
+.pic.stk{background:#fff!important;border-radius:8px;overflow:hidden}
+.pic.stk img{display:block;width:auto;height:auto;max-height:140px;max-width:140px;border-radius:0;object-fit:contain;background:#fff}
+/* 表情包瀑布流：每张图按原始宽高比显示，不再强制正方形或留空 */
+.stk-grid{column-count:4;column-gap:10px;max-height:46vh;overflow-y:auto;flex:none;-webkit-overflow-scrolling:touch}
+.panel .stk-t{position:relative;display:inline-block;vertical-align:top;width:100%;height:auto;min-height:0;padding:0;margin:0 0 10px;border-radius:8px;background:#fff;overflow:hidden;break-inside:avoid;page-break-inside:avoid}
+.stk-t img{display:block;width:100%;height:auto;object-fit:contain;background:#fff}
 .stk-t.off img{opacity:.4}
 .stk-t .x{position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;background:#e5484d;color:#fff;font-size:14px;line-height:20px;text-align:center}
 .bgwrap{display:flex;flex-direction:column;gap:10px}
@@ -602,6 +603,12 @@ textarea{padding:8px 0 8px 14px}
 .cd{padding:13px 0;gap:11px;border-bottom:1px solid rgba(0,0,0,.12)}
 .cd-main{padding:2px 0}.cd-t{font-size:14px;line-height:1.55}.cd-m{font-size:10px;letter-spacing:.02em;color:#777777}
 .cd-img{width:54px;height:54px;border-radius:13px;border:1px solid rgba(0,0,0,.2)}
+/* 表情包缩略图保持原比例，透明区域统一以白色呈现 */
+.cd-img{width:auto!important;height:auto!important;max-width:80px;max-height:80px;object-fit:contain;background:#fff;border-radius:8px}
+.mine .m.pic.stk,.theirs .m.pic.stk{background:#fff!important;border-radius:8px;overflow:hidden}
+.stk-grid{column-count:4;column-gap:10px}
+.panel .stk-t{display:inline-block;width:100%;height:auto;margin:0 0 10px;padding:0;background:#fff;break-inside:avoid}
+.stk-t img{display:block;width:100%;height:auto;background:#fff;object-fit:contain}
 .mini,.panel .mini{border:1px solid rgba(0,0,0,.28);border-radius:12px;background:#f2f2f2;padding:7px 9px;color:#171717}
 #cpBar{background:#fff;padding-top:12px;border-top:1px solid rgba(0,0,0,.18)}
 .panel{border:1px solid rgba(0,0,0,.14);box-shadow:0 -12px 45px rgba(0,0,0,.08);border-radius:24px 24px 0 0;gap:14px}
@@ -1811,14 +1818,20 @@ function readImg(file,max,q){
   return new Promise((res,rej)=>{
     const rd=new FileReader();rd.onerror=()=>rej();
     rd.onload=()=>{
-      if(file.type==='image/gif'){if(file.size>4*1024*1024)rej('big');else res(rd.result);return}
+      /* GIF / APNG / WebP 保留原文件，避免 canvas 截取首帧导致动态表情变静态；透明区域由白色预览底承接 */
+      const animatedOrAlpha=/image\/(gif|png|webp)/i.test(file.type);
+      if(animatedOrAlpha){
+        if(file.size>4*1024*1024){rej('big');return}
+        res(rd.result);return;
+      }
       const im=new Image();im.onerror=()=>rej();
       im.onload=()=>{
         const k=Math.min(1,max/Math.max(im.naturalWidth,im.naturalHeight)),c=document.createElement('canvas');
-        c.width=Math.round(im.naturalWidth*k);c.height=Math.round(im.naturalHeight*k);
-        const x=c.getContext('2d'),png=/png|webp/.test(file.type);
-        if(!png){x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height)}
-        x.drawImage(im,0,0,c.width,c.height);res(c.toDataURL(png?'image/png':'image/jpeg',q));
+        c.width=Math.max(1,Math.round(im.naturalWidth*k));c.height=Math.max(1,Math.round(im.naturalHeight*k));
+        const x=c.getContext('2d');
+        /* 先铺白底，再按图片本身比例绘制，透明底会变白且不会增加边缘空白 */
+        x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);
+        x.drawImage(im,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',q));
       };
       im.src=rd.result;
     };
@@ -1826,10 +1839,10 @@ function readImg(file,max,q){
   });
 }
 function pickStickers(cb){
-  const f=document.createElement('input');f.type='file';f.accept='image/*';f.multiple=true;
+  const f=document.createElement('input');f.type='file';f.accept='image/gif,image/png,image/webp,image/jpeg,image/*';f.multiple=true;
   f.onchange=async()=>{
     let n=0;
-    for(const file of f.files){try{cb(await readImg(file,480,.85));n++}catch(e){toast(e==='big'?'动图超过 4MB，已跳过':'有图片读取失败')}}
+    for(const file of f.files){try{cb(await readImg(file,480,.85));n++}catch(e){toast(e==='big'?'表情包文件超过 4MB，已跳过':'有图片读取失败')}}
     if(n)toast('已添加 '+n+' 个表情包');
   };
   f.click();
