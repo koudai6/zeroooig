@@ -1474,14 +1474,14 @@ async function vEnd(doSend){
 /* 设置 */
 $('more').onclick=()=>{$('fName').value=S.profile.name;$('fMy').value=S.profile.myName||'我';$('sheet').hidden=false};
 function pickFiles(max,q,cb){
-  const f=document.createElement('input');f.type='file';f.accept='image/*,.gif,.webp,.apng';f.multiple=true;
+  const f=document.createElement('input');f.type='file';f.accept='image/*,.gif,.webp,.apng,.png';f.multiple=true;
   f.onchange=async()=>{const files=Array.from(f.files||[]);if(!files.length)return;const out=[];
     for(const file of files){try{out.push(await new Promise((resolve,reject)=>{const rd=new FileReader();rd.onerror=()=>reject();rd.onload=()=>{if(/image\/(gif|apng|png|webp)/i.test(file.type)){resolve(rd.result);return}const im=new Image();im.onerror=()=>reject();im.onload=()=>{const k=Math.min(1,max/Math.max(im.naturalWidth,im.naturalHeight)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(im.naturalWidth*k));c.height=Math.max(1,Math.round(im.naturalHeight*k));const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0,c.width,c.height);resolve(c.toDataURL('image/jpeg',q))};im.src=rd.result};rd.readAsDataURL(file)}))}catch(e){toast('有图片读取失败')}}
     out.forEach((src,i)=>push({id:Date.now()+i,mine:true,type:'image',src,t:Date.now()+i,read:false}));
   };f.click();
 }
 function pickFile(max,q,cb){
-  const f=document.createElement('input');f.type='file';f.accept='image/*,.gif,.webp,.apng';
+  const f=document.createElement('input');f.type='file';f.accept='image/*,.gif,.webp,.apng,.png';
   f.onchange=()=>{const file=f.files[0];if(!file)return;const rd=new FileReader();
     rd.onload=()=>{if(/image\/(gif|apng|png|webp)/i.test(file.type)){cb(rd.result);return}const im=new Image();im.onload=()=>{
       const k=Math.min(1,max/Math.max(im.naturalWidth,im.naturalHeight)),c=document.createElement('canvas');
@@ -1797,8 +1797,9 @@ document.addEventListener('pointerdown',e=>{if(!$('pop').hidden&&!$('pop').conta
 /* ========== 表情包（和字卡库里的「表情包」是同一份数据） ========== */
 function readImg(file,max,q){
   return new Promise((res,rej)=>{
-    const animated=/image\/(gif|apng|png|webp)/i.test(file.type);
-    /* GIF/APNG/WebP 原文件保留，避免 canvas 把动画压成首帧；也保留原始尺寸比例 */
+    const ext=(file.name||'').toLowerCase().split('.').pop();
+    const animated=/image\/(gif|apng|png|webp)/i.test(file.type)||['gif','apng','png','webp'].includes(ext);
+    /* GIF/APNG/WebP/PNG 原文件保留，避免 canvas 把动画压成首帧；也保留原始尺寸比例 */
     if(animated){
       if(file.size>8*1024*1024){rej('big');return}
       const rd=new FileReader();rd.onerror=()=>rej();rd.onload=()=>res(rd.result);rd.readAsDataURL(file);return;
@@ -1813,7 +1814,7 @@ function readImg(file,max,q){
   });
 }
 function pickStickers(cb){
-  const f=document.createElement('input');f.type='file';f.accept='image/*,.gif,.webp,.apng';f.multiple=true;
+  const f=document.createElement('input');f.type='file';f.accept='image/*,.gif,.webp,.apng,.png';f.multiple=true;
   f.onchange=async()=>{
     let n=0;
     for(const file of f.files){try{cb(await readImg(file,480,.85));n++}catch(e){toast(e==='big'?'动图超过 8MB，已跳过':'有图片读取失败')}}
@@ -1969,7 +1970,7 @@ function bgTab(body){
     toast('10 秒后对方会主动发一次，请现在锁屏');
     setTimeout(()=>{if(!replyPool(ct).length)notify(ct.profile.name,'没有可用字卡，测试消息','test',true);else proactive(ct,true)},10000);
   });
-  w.append(h('div','hint','保活原理：循环播放一段听不见的静音音频，让系统把网页当成「正在播放音乐」。锁屏会出现播放卡片（对方头像、昵称和状态），灵动岛也会显示音频，对方的延迟回复才能在后台照常触发。灵动岛的样式由系统决定，网页无法自定义；新消息通过通知横幅显示。iOS 随时可能回收，不能保证一直在线；开着会多耗一点电，不用时记得关闭。'));
+  w.append(h('div','hint','保活原理：循环播放一段听不见的静音音频，让系统把网页当成「正在播放音乐」。锁屏会出现播放卡片（对方头像和昵称），灵动岛也会显示音频，对方的延迟回复才能在后台照常触发。灵动岛的样式由系统决定，网页无法自定义；新消息通过通知横幅显示。iOS 随时可能回收，不能保证一直在线；开着会多耗一点电，不用时记得关闭。'));
   body.append(w);
 }
 
@@ -2836,7 +2837,7 @@ function drawMomImgs(){
   if(momImgs.length<9){const a=h('button','mwadd','＋');a.onclick=pickMomImgs;g.append(a)}
 }
 function pickMomImgs(){
-  const f=document.createElement('input');f.type='file';f.accept='image/*,.gif,.webp,.apng';f.multiple=true;
+  const f=document.createElement('input');f.type='file';f.accept='image/*,.gif,.webp,.apng,.png';f.multiple=true;
   f.onchange=async()=>{for(const file of f.files){if(momImgs.length>=9)break;try{momImgs.push(await readImg(file,1280,.82))}catch(e){toast('有图片读取失败')}}drawMomImgs()};
   f.click();
 }
@@ -3247,3 +3248,49 @@ html,body{overscroll-behavior:none}
 @keyframes vp{0%,100%{box-shadow:0 0 0 0 rgba(0,0,0,.5)}50%{box-shadow:0 0 0 14px rgba(0,0,0,0)}}
 @keyframes vb{from{transform:scaleY(.5)}to{transform:scaleY(1.15)}}
 </style>
+
+<style id="zeroooig-final-ios18-overrides">
+/* 引用行：固定为参考图的简洁引用样式，确保覆盖旧版 P2 样式 */
+.qline{display:flex!important;align-items:center;gap:7px;box-sizing:border-box;flex:none!important;width:fit-content;max-width:78%!important;min-height:20px;margin:5px 0 2px!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;color:#92949a!important;font-size:12px!important;line-height:1.4!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qline b{flex:none!important;margin:0!important;color:#91a9ce!important;font-weight:600!important}
+.qline span{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;color:#92949a!important}
+.qline.theirs{align-self:flex-start!important;margin-left:18px!important;padding-left:9px!important;border-left:2px solid #b8c1ce!important}
+.qline.mine{align-self:flex-end!important;margin-right:16px!important;padding-right:9px!important;border-right:2px solid #b8c1ce!important;text-align:right}
+.qline+.r{margin-top:4px!important}
+@media(prefers-color-scheme:dark){.qline,.qline span{color:#a1a1a8!important}.qline b{color:#9eb4d8!important}.qline.theirs{border-left-color:#727b89!important}.qline.mine{border-right-color:#727b89!important}}
+/* 表情包库：四列可纵向滑动；每张图保留自身宽高比，不裁切、不拉伸 */
+.stk-grid{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;grid-auto-rows:minmax(84px,auto)!important;align-items:center!important;justify-items:center!important;gap:10px 8px!important;width:100%!important;max-width:100%!important;max-height:min(58dvh,520px)!important;overflow-x:hidden!important;overflow-y:auto!important;flex:none!important;padding:8px 2px 14px!important;-webkit-overflow-scrolling:touch!important;overscroll-behavior:contain}
+.stk-t,.panel .stk-t{position:relative!important;display:flex!important;align-items:center!important;justify-content:center!important;box-sizing:border-box!important;width:100%!important;min-width:0!important;max-width:100%!important;height:auto!important;min-height:84px!important;max-height:140px!important;padding:5px!important;border:1px solid var(--line)!important;border-radius:12px!important;background:var(--gray)!important;overflow:hidden!important}
+.stk-t img{position:static!important;display:block!important;width:auto!important;height:auto!important;max-width:100%!important;max-height:126px!important;object-fit:contain!important}
+.stk-t .x{position:absolute!important;top:3px!important;right:3px!important;z-index:3}
+.pic.stk img,.pic img.sticker{display:block!important;width:auto!important;height:auto!important;max-width:min(240px,72vw)!important;max-height:240px!important;object-fit:contain!important}
+.stk-empty{grid-column:1/-1!important}
+/* iOS 18 主屏幕 Web App：底栏不重复叠加安全区，避免过高 */
+@media(display-mode:standalone){
+ html,body{height:100%;overscroll-behavior:none}
+ .bar{box-sizing:border-box!important;min-height:0!important;padding:5px 9px max(4px,env(safe-area-inset-bottom))!important;gap:6px!important;align-items:center!important}
+ .field{box-sizing:border-box!important;min-height:40px!important;height:auto!important}
+ .field textarea,#ta{box-sizing:border-box!important;min-height:36px!important;height:36px!important;max-height:96px!important;padding-top:7px!important;padding-bottom:7px!important;line-height:21px!important}
+ .plus{width:38px!important;height:40px!important;min-width:38px!important}
+ .sendc,.sendc.hide{flex:0 0 40px!important;width:40px!important;min-width:40px!important;height:40px!important}
+}
+/* 不抢夺 iOS 原生点击焦点，保证用户点输入框时由系统弹出键盘 */
+#ta{position:relative!important;z-index:5!important;display:block!important;pointer-events:auto!important;touch-action:pan-y!important;-webkit-user-select:text!important;user-select:text!important;-webkit-appearance:none;}
+.field{position:relative!important;z-index:4!important;pointer-events:auto!important}
+.field textarea{pointer-events:auto!important;-webkit-user-select:text!important;user-select:text!important}
+</style>
+<script id="zeroooig-ios18-keyboard-final">
+(()=>{
+ const ta=document.getElementById('ta');
+ if(!ta)return;
+ // Let Safari handle the trusted tap-to-focus; only recalculate layout after native focus.
+ ta.addEventListener('focus',()=>{
+   requestAnimationFrame(()=>{if(window.relayout)window.relayout();});
+ });
+ if(window.visualViewport){
+   let raf=0;
+   const update=()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;if(document.activeElement===ta&&window.relayout)window.relayout();});};
+   visualViewport.addEventListener('resize',update);
+ }
+})();
+</script>
