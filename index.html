@@ -3111,7 +3111,18 @@ $('ltT').onclick=()=>{const s=sg();if(!s)return;let a,b2;
 /* 键盘弹出时让输入框保持真实焦点；不调用 scrollIntoView，避免 iOS PWA 视口二次偏移 */
 #ta{pointer-events:auto!important;touch-action:manipulation!important;-webkit-user-select:text!important;user-select:text!important}
 </style>
-</body>
+
+<style id="ios18-composer-compact-v3">
+/* 在保留 iOS 原生输入焦点与安全区的前提下，轻微压低底部输入栏 */
+@media (display-mode: standalone) {
+  .bar { padding-top: 2px !important; padding-bottom: max(2px, env(safe-area-inset-bottom)) !important; gap: 5px !important; }
+  .field { min-height: 36px !important; height: 36px !important; }
+  .field textarea, #ta { min-height: 32px !important; height: 32px !important; padding-top: 5px !important; padding-bottom: 5px !important; line-height: 22px !important; }
+  .plus { width: 36px !important; height: 36px !important; min-width: 36px !important; }
+  .sendc, .sendc.hide { flex-basis: 36px !important; width: 36px !important; min-width: 36px !important; height: 36px !important; }
+}
+</style>
+\n</body>
 </html>
 
 <style>
