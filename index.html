@@ -1291,7 +1291,7 @@ const G={contacts:[],cur:null,cards:[],groups:[{id:'public',name:'公共（未�
 const ctOf=id=>G.contacts.find(c=>c.id===id);
 const cur=()=>ctOf(G.cur);
 const S={};
-['msgs','profile','cfg','status'].forEach(k=>Object.defineProperty(S,k,{get:()=>cur()[k],set:v=>{cur()[k]=v}}));
+['msgs','profile','cfg'].forEach(k=>Object.defineProperty(S,k,{get:()=>cur()[k],set:v=>{cur()[k]=v}}));
 ['cards','groups','cardSeq','skin','skins'].forEach(k=>Object.defineProperty(S,k,{get:()=>G[k],set:v=>{G[k]=v}}));
 const RT={},rt=ct=>RT[ct.id]||(RT[ct.id]={typing:false,timer:null});
 let booted=false,timer,view='list',modalAt=0,modalSeq=0,quoted=null,editing=null;
@@ -1749,9 +1749,7 @@ setInterval(()=>{
 })();
 
 /* ========== 状态：每隔设定小时数从状态字卡里换一条 ========== */
-function tickStatus(){ /* 状态字卡功能已移除；保留空函数兼容旧调用。 */ }
-setInterval(tickStatus,60000);
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&booted)tickStatus()});
+/* 状态字卡功能已整体移除 */
 
 /* ========== 消息：复制 / 引用 / 修改 / 删除 ========== */
 function setQ(){
@@ -2275,7 +2273,7 @@ function patDlg(){
 const h=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
 const V={type:'all',group:'all',q:'',multi:false,sel:new Set()};
 const EMO=/^\p{Extended_Pictographic}[\p{Extended_Pictographic}\uFE0F\u200D]*$/u;
-const TN={text:'文字',emoji:'Emoji',image:'表情包',status:'状态',pat:'拍一拍'};
+const TN={text:'文字',emoji:'Emoji',image:'表情包',pat:'拍一拍'};
 const gName=id=>(S.groups.find(g=>g.id===id)||S.groups[0]).name;
 const mk=(type,content,group)=>({id:S.cardSeq++,type,content,group,enabled:true});
 function modal(title,build,btns){
@@ -2321,7 +2319,6 @@ function renderCards(){
     }
     L.append(r);
   });
-  tickStatus();
   $('cpBar').hidden=!V.multi;$('cpSel').textContent='已选 '+V.sel.size;$('cpMulti').textContent=V.multi?'完成':'多选';
 }
 function openCards(){V.multi=false;V.sel.clear();$('cardsPage').hidden=false;renderCards()}
@@ -2403,7 +2400,7 @@ function isReplyGroupBackup(d){
   return false;
 }
 function normalizeCardType(t,content){
-  if(t&&['text','emoji','image','status','pat'].includes(t))return t;
+  if(t&&['text','emoji','image','pat'].includes(t))return t;
   if(typeof content==='string'&&EMO.test(content.trim()))return 'emoji';
   return 'text';
 }
@@ -2439,7 +2436,7 @@ function applyCardImport(payload,mode){
     const content=String(rawContent).trim();
     if(!content)return;
     const type=normalizeCardType(c.type,content);
-    if(!['text','emoji','image','status','pat'].includes(type))return;
+    if(!['text','emoji','image','pat'].includes(type))return;
     let gid='public';
     if(c.group!=null&&map[c.group]!=null)gid=map[c.group];
     else if(c.groupName&&map[c.groupName]!=null)gid=map[c.groupName];
@@ -2535,7 +2532,8 @@ function importFullBackup(){
     if(!st||!Array.isArray(st.contacts)||!Array.isArray(st.cards)||!Array.isArray(st.groups))throw Error('invalid');
     askYes('导入完整备份会替换当前联系人、聊天记录、字卡和装扮。建议先导出当前备份。确定继续吗？',async()=>{
       G.contacts=st.contacts;G.cards=st.cards;G.groups=st.groups;G.cardSeq=st.cardSeq||1;G.skin={...SKIN_DEF,...(st.skin||{})};G.skins=Array.isArray(st.skins)?st.skins:[];G.sys=st.sys||G.sys;
-      G.cur=null;G.contacts.forEach(ct=>{ct.cfg={...DEF_CFG,...(ct.cfg||{})};ct.msgs=ct.msgs||[];ct.letters=ct.letters||[];ct.moments=ct.moments||[];ct.momPending=ct.momPending||[];ct.momUnread=ct.momUnread||0;ct.momPlan=ct.momPlan||null;ct.momDay=ct.momDay||{day:'',count:0};ct.profile={name:'联系人',avatar:'',myAvatar:'',bg:'',myName:'我',...(ct.profile||{})};ct.status=ct.status||{text:'',at:0};ct.sel=ct.sel||G.groups.map(g=>g.id)});
+      G.cur=null;G.cards=(G.cards||[]).filter(c=>c&&c.type!=='status');
+      G.contacts.forEach(ct=>{delete ct.status;ct.cfg={...DEF_CFG,...(ct.cfg||{})};ct.msgs=ct.msgs||[];ct.letters=ct.letters||[];ct.moments=ct.moments||[];ct.momPending=ct.momPending||[];ct.momUnread=ct.momUnread||0;ct.momPlan=ct.momPlan||null;ct.momDay=ct.momDay||{day:'',count:0};ct.profile={name:'联系人',avatar:'',myAvatar:'',bg:'',myName:'我',...(ct.profile||{})};delete ct.status;ct.sel=ct.sel||G.groups.map(g=>g.id)});
       V.q='';V.type='all';V.group='all';V.multi=false;V.sel.clear();applySkin();view='list';closePop();closePP();$('list').hidden=false;['cardsPage','cfgPage'].forEach(i=>{const e=$(i);if(e)e.hidden=true});renderList();booted=true;await kv.set('state',G);flush();toast('完整备份导入成功');
     },'确认导入');
   }catch(e){toast('备份文件无效，未更改现有数据')}};rd.readAsText(file)};f.click();
@@ -2545,7 +2543,7 @@ function importFullBackup(){
 /* ========== 联系人 ========== */
 function addGroup(g){G.groups.push(g);G.contacts.forEach(c=>c.sel.push(g.id))}
 function newContact(name,avatar){
-  const ct={id:'c'+Date.now()+Math.random().toString(36).slice(2,5),created:Date.now(),profile:{name,avatar:avatar||'',myAvatar:'',bg:'',myName:'我'},cfg:{...DEF_CFG},msgs:[],status:{text:'',at:0},sel:G.groups.map(g=>g.id),unread:0,letters:[],letterSeq:1,pending:[],plan:null,dayCount:{day:'',count:0},moments:[],momPending:[],momUnread:0,momPlan:null,momDay:{day:'',count:0}};
+  const ct={id:'c'+Date.now()+Math.random().toString(36).slice(2,5),created:Date.now(),profile:{name,avatar:avatar||'',myAvatar:'',bg:'',myName:'我'},cfg:{...DEF_CFG},msgs:[],sel:G.groups.map(g=>g.id),unread:0,letters:[],letterSeq:1,pending:[],plan:null,dayCount:{day:'',count:0},moments:[],momPending:[],momUnread:0,momPlan:null,momDay:{day:'',count:0}};
   G.contacts.push(ct);return ct;
 }
 const lastOf=ct=>ct.msgs.length?ct.msgs[ct.msgs.length-1]:null;
@@ -3061,10 +3059,11 @@ $('ltT').onclick=()=>{const s=sg();if(!s)return;let a,b2;
     if(d.listen&&Array.isArray(d.listen.songs))G.listen=d.listen;
   }
   if(lite&&Array.isArray(lite.contacts))lite.contacts.forEach(lc=>{const ct=ctOf(lc.id);if(ct){{const {avatar,myAvatar,bg,callBg,momCover,...lp}=lc.profile||{};ct.profile={...ct.profile,...lp}}ct.cfg={...ct.cfg,...lc.cfg};if(lc.sel)ct.sel=lc.sel}});
+  G.cards=(G.cards||[]).filter(c=>c&&c.type!=='status');
   G.contacts.forEach(ct=>{
-    ct.cfg={...DEF_CFG,...(ct.cfg||{})};
+    delete ct.status;ct.cfg={...DEF_CFG,...(ct.cfg||{})};
     ct.profile={name:'联系人',avatar:'',myAvatar:'',bg:'',myName:'我',...(ct.profile||{})};
-    ct.msgs=ct.msgs||[];ct.status=ct.status||{text:'',at:0};ct.sel=ct.sel||G.groups.map(g=>g.id);ct.unread=ct.unread||0;
+    ct.msgs=ct.msgs||[];delete ct.status;ct.sel=ct.sel||G.groups.map(g=>g.id);ct.unread=ct.unread||0;
     ct.letters=ct.letters||[];ct.moments=ct.moments||[];ct.momPending=ct.momPending||[];ct.momUnread=ct.momUnread||0;ct.momPlan=ct.momPlan||null;ct.momDay=ct.momDay||{day:'',count:0};ct.letterSeq=ct.letterSeq||1;ct.pending=ct.pending||[];ct.plan=ct.plan||null;ct.dayCount=ct.dayCount||{day:'',count:0};
   });
   G.cardSeq=Math.max(0,...G.cards.map(c=>Number(c.id)||0))+1;
@@ -3073,12 +3072,50 @@ $('ltT').onclick=()=>{const s=sg();if(!s)return;let a,b2;
   G.contacts.forEach(ct=>ct.msgs.forEach(m=>{
     if(m.type==='poll'&&m.status==='pending')schedulePoll(m,ct);
   }));
-  tickStatus();checkMoments();
+  checkMoments();
   if(G.sys.keepAlive){toast('点一下屏幕恢复后台保活');document.addEventListener('pointerdown',()=>{startKeep()},{once:true,capture:true})}
   if('serviceWorker' in navigator&&/^https?:/.test(location.protocol))navigator.serviceWorker.register('sw.js').catch(()=>{});
 })();
 })();
 </script>
+
+<style id="ios18-quote-sticker-fixes">
+/* 引用样式：消息气泡外的一行引用，像参考图一样以竖线收尾/起始 */
+.qline{display:flex!important;align-items:center;gap:8px;width:fit-content;max-width:78%;min-height:22px;margin-top:5px;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;font-size:13px!important;line-height:1.45!important;color:#92969e!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qline b{flex:none!important;margin:0!important;color:#8fa3c6!important;font-weight:600!important}
+.qline span{min-width:0;overflow:hidden;text-overflow:ellipsis;color:#92969e!important}
+.qline.theirs{align-self:flex-start;margin-left:18px!important;padding-left:9px!important;border-left:3px solid #aeb8ca!important}
+.qline.mine{align-self:flex-end;margin-right:16px!important;padding-right:9px!important;border-right:3px solid #aeb8ca!important;text-align:right}
+.qline+.r{margin-top:4px!important}
+@media(prefers-color-scheme:dark){.qline,.qline span{color:#a0a0a6!important}.qline b{color:#9aafd4!important}.qline.theirs{border-left-color:#737b89!important}.qline.mine{border-right-color:#737b89!important}}
+/* 表情包库：像微信一样纵向滑动浏览，四列排布；图片保持原始比例，不裁切 */
+.stk-grid{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;grid-auto-rows:minmax(76px,auto);align-items:center;justify-items:center;gap:10px 8px!important;width:100%;max-width:100%;max-height:min(58vh,520px)!important;overflow-x:hidden!important;overflow-y:auto!important;flex:none!important;padding:8px 2px 14px!important;scroll-snap-type:y proximity!important;-webkit-overflow-scrolling:touch}
+.stk-t{display:flex!important;align-items:center;justify-content:center;width:100%!important;min-width:0!important;max-width:100%!important;min-height:76px!important;height:auto!important;padding:5px!important;border:1px solid var(--line)!important;border-radius:13px!important;background:var(--gray)!important;overflow:hidden}
+.stk-t img{display:block!important;width:auto!important;height:auto!important;max-width:100%!important;max-height:112px!important;object-fit:contain!important}
+.stk-t .x{z-index:2}
+.pic.stk img{width:auto!important;height:auto!important;max-width:min(220px,68vw)!important;max-height:220px!important;object-fit:contain!important;border-radius:8px}
+.stk-empty{grid-column:1/-1}
+/* iOS 18 添加到主屏幕：底栏压低，避免安全区被重复计算 */
+@media(display-mode:standalone){
+ .bar{min-height:54px!important;padding:5px 10px max(3px,env(safe-area-inset-bottom))!important;gap:7px!important;align-items:center!important}
+ .field{min-height:44px!important}
+ .field textarea,#ta{height:38px;min-height:38px!important;max-height:100px!important;padding-top:7px!important;padding-bottom:7px!important}
+ .plus{width:40px!important;height:42px!important}
+ .sendc,.sendc.hide{flex-basis:42px!important;width:42px!important;min-width:42px!important;height:42px!important}
+}
+/* 键盘弹出时让输入框保持真实焦点；不调用 scrollIntoView，避免 iOS PWA 视口二次偏移 */
+#ta{pointer-events:auto!important;touch-action:manipulation!important;-webkit-user-select:text!important;user-select:text!important}
+</style>
+<script id="ios18-input-focus-fix">
+(()=>{const ta=document.getElementById('ta');if(!ta)return;
+ const focus=()=>{if(document.activeElement!==ta){try{ta.focus({preventScroll:true})}catch(_){ta.focus()}}};
+ ta.addEventListener('pointerdown',focus,{passive:true});
+ ta.addEventListener('touchend',focus,{passive:true});
+ ta.addEventListener('click',focus);
+ ta.addEventListener('focus',()=>{requestAnimationFrame(()=>{if(window.relayout)window.relayout();const c=document.getElementById('chat');if(c)setTimeout(()=>{c.scrollTop=c.scrollHeight},80)})});
+})();
+</script>
+
 </body>
 </html>
 
