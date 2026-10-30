@@ -3408,14 +3408,12 @@ html,body{overscroll-behavior:none}
 <script id="ios18-keyboard-repair-v2-script">
 (()=>{
  const input=document.getElementById('ta'); if(!input)return;
- // Only focus synchronously from a real user gesture. Never refocus on touchend/click.
- const nativeFocus=()=>{ if(document.activeElement!==input){try{input.focus({preventScroll:true})}catch(_){input.focus()}} };
- input.addEventListener('touchstart',nativeFocus,{capture:true,passive:true});
- input.addEventListener('pointerdown',nativeFocus,{capture:true,passive:true});
+ // 不在 touchstart/pointerdown 中主动 focus，避免 iOS PWA 抢焦点导致键盘不弹或闪退。
  const vv=window.visualViewport;
  if(vv){let raf=0;const update=()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;if(document.activeElement===input&&window.relayout)window.relayout()})};vv.addEventListener('resize',update);vv.addEventListener('scroll',update)}
+ input.addEventListener('focus',()=>requestAnimationFrame(()=>{if(window.relayout)window.relayout()}));
 })();
-
+</script>
 
 <style id="zeroooig-chat-sticker-compact">
 /* 聊天消息中的表情包缩小显示；普通相册图片和表情包库不受影响 */
@@ -3429,4 +3427,39 @@ html,body{overscroll-behavior:none}
   object-fit:contain!important;
 }
 </style>
-</script>
+
+<style id="zeroooig-ios18-final-input-sticker">
+/* 最终覆盖：iOS 主屏幕模式底栏紧凑，不重复计算安全区 */
+@media (display-mode: standalone) {
+  #app { min-height:0!important; }
+  .bar {
+    box-sizing:border-box!important;
+    flex:0 0 auto!important;
+    min-height:0!important;
+    height:auto!important;
+    padding:3px 9px max(3px, var(--sab, env(safe-area-inset-bottom)))!important;
+    gap:6px!important;
+    align-items:center!important;
+  }
+  .field { min-height:0!important; height:auto!important; }
+  .field textarea, #ta {
+    box-sizing:border-box!important;
+    min-height:34px!important;
+    height:34px!important;
+    max-height:88px!important;
+    padding:5px 0 5px 14px!important;
+    line-height:22px!important;
+  }
+  .plus,.sendc,.sendc.hide { height:36px!important; min-height:36px!important; }
+  .plus { width:36px!important; min-width:36px!important; }
+  .sendc,.sendc.hide { flex:0 0 36px!important; width:36px!important; min-width:36px!important; }
+}
+/* 聊天中的表情包固定在小尺寸盒内，完整显示原图比例，动图仍使用原始 data URL */
+#chat .r .m.pic.stk { display:inline-flex!important; align-items:center!important; justify-content:center!important; padding:0!important; overflow:visible!important; background:transparent!important; }
+#chat .r .m.pic.stk img,
+#chat .r .m.pic img.sticker {
+  display:block!important; width:auto!important; height:auto!important;
+  max-width:min(124px,40vw)!important; max-height:124px!important;
+  object-fit:contain!important; object-position:center!important;
+}
+</style>
