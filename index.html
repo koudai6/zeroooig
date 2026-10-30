@@ -2524,24 +2524,59 @@ $('cpImport').onclick=()=>{
     }catch(e){toast('文件格式不正确，请选择字卡库或回复分组 JSON 备份')}};
     rd.readAsText(file)};f.click();
 };
-function exportFullBackup(){
-  flush();
-  const data={format:'chat-full-backup',version:1,exportedAt:new Date().toISOString(),state:G};
-  downloadJSON(data,'聊天网站完整备份_'+new Date().toISOString().slice(0,10)+'.json');
-  toast('完整备份已导出');
+function blobToDataURL(blob){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error||new Error('音频读取失败'));r.readAsDataURL(blob)})}
+function dataURLToBlob(url){const m=/^data:([^;,]+)?(;base64)?,(.*)$/s.exec(String(url||''));if(!m)throw Error('资源数据格式无效');const mime=m[1]||'application/octet-stream';let bytes;if(m[2]){const raw=atob(m[3]);bytes=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i)}else bytes=new TextEncoder().encode(decodeURIComponent(m[3]));return new Blob([bytes],{type:mime})}
+function parseBackupOffMainThread(file){return new Promise((resolve,reject)=>{let worker,url;try{const src='onmessage=e=>{try{const d=JSON.parse(e.data);postMessage({ok:true,data:d})}catch(x){postMessage({ok:false,error:String(x&&x.message||x)})}}';url=URL.createObjectURL(new Blob([src],{type:'text/javascript'}));worker=new Worker(url);worker.onmessage=e=>{worker.terminate();URL.revokeObjectURL(url);e.data&&e.data.ok?resolve(e.data.data):reject(Error(e.data&&e.data.error||'JSON解析失败'))};worker.onerror=()=>{worker.terminate();URL.revokeObjectURL(url);reject(Error('后台解析失败'))};file.text().then(t=>worker.postMessage(t),reject)}catch(e){if(worker)worker.terminate();if(url)URL.revokeObjectURL(url);reject(e)}})}
+async function exportFullBackup(){
+  toast('正在整理完整备份…');
+  try{
+    flush();
+    const state=JSON.parse(JSON.stringify(G)),audio=[];
+    const songs=state.listen&&Array.isArray(state.listen.songs)?state.listen.songs:[];
+    for(let i=0;i<songs.length;i++){
+      const song=songs[i];if(song&&song.kind==='file'&&song.id){const blob=await kv.get('mus'+song.id);if(blob){audio.push({id:song.id,name:song.title||'本地音频',type:blob.type||'application/octet-stream',data:await blobToDataURL(blob)})}else song.assetMissing=true}
+      if(i%3===0)await new Promise(r=>setTimeout(r,0));
+    }
+    const data={format:'chat-full-backup',version:2,exportedAt:new Date().toISOString(),includes:['应用内用户数据','已嵌入的图片/表情/头像/背景','本地导入音频'],excludes:['网站程序源码与部署文件','服务器端资源与外部链接内容'],state,audio};
+    downloadJSON(data,'聊天网站完整备份_'+new Date().toISOString().slice(0,10)+'.json');
+    toast('完整备份已导出'+(audio.length?'（含 '+audio.length+' 个本地音频）':''));
+  }catch(e){console.error(e);toast('备份导出失败：'+(e.message||'资源读取错误'))}
 }
 function importFullBackup(){
   const f=document.createElement('input');f.type='file';f.accept='.json,application/json';
-  f.onchange=()=>{const file=f.files&&f.files[0];if(!file)return;const rd=new FileReader();rd.onload=()=>{try{
-    const d=JSON.parse(rd.result),st=d&&d.state;
-    if(!st||!Array.isArray(st.contacts)||!Array.isArray(st.cards)||!Array.isArray(st.groups))throw Error('invalid');
-    askYes('导入完整备份会替换当前联系人、聊天记录、字卡和装扮。建议先导出当前备份。确定继续吗？',async()=>{
-      G.contacts=st.contacts;G.cards=st.cards;G.groups=st.groups;G.cardSeq=st.cardSeq||1;G.skin={...SKIN_DEF,...(st.skin||{})};G.skins=Array.isArray(st.skins)?st.skins:[];G.sys=st.sys||G.sys;
-      G.cur=null;G.cards=(G.cards||[]).filter(c=>c&&c.type!=='status');
-      G.contacts.forEach(ct=>{delete ct.status;ct.cfg={...DEF_CFG,...(ct.cfg||{})};ct.msgs=ct.msgs||[];ct.letters=ct.letters||[];ct.moments=ct.moments||[];ct.momPending=ct.momPending||[];ct.momUnread=ct.momUnread||0;ct.momPlan=ct.momPlan||null;ct.momDay=ct.momDay||{day:'',count:0};ct.profile={name:'联系人',avatar:'',myAvatar:'',bg:'',myName:'我',...(ct.profile||{})};delete ct.status;ct.sel=ct.sel||G.groups.map(g=>g.id)});
-      V.q='';V.type='all';V.group='all';V.multi=false;V.sel.clear();applySkin();view='list';closePop();closePP();$('list').hidden=false;['cardsPage','cfgPage'].forEach(i=>{const e=$(i);if(e)e.hidden=true});renderList();booted=true;await kv.set('state',G);flush();toast('完整备份导入成功');
-    },'确认导入');
-  }catch(e){toast('备份文件无效，未更改现有数据')}};rd.readAsText(file)};f.click();
+  f.onchange=()=>{const file=f.files&&f.files[0];if(!file)return;
+    toast('正在读取备份…');
+    parseBackupOffMainThread(file).then(d=>{
+      const st=d&&d.state;
+      if(!st||!Array.isArray(st.contacts)||!Array.isArray(st.cards)||!Array.isArray(st.groups))throw Error('备份结构不完整');
+      if(d.format&&d.format!=='chat-full-backup')throw Error('不是本网站的完整备份文件');
+      if(d.audio!=null&&!Array.isArray(d.audio))throw Error('音频资源列表无效');
+      askYes('导入将替换当前联系人、聊天记录、字卡、装扮、设置及本地音乐。请先导出当前备份。网站程序源码不包含在数据备份中。确定继续吗？',async()=>{
+        try{
+          toast('正在校验并准备数据…');
+          const candidate=JSON.parse(JSON.stringify(st));
+          candidate.contacts=candidate.contacts.filter(Boolean);
+          candidate.cards=candidate.cards.filter(c=>c&&c.type!=='status');
+          candidate.groups=candidate.groups.filter(Boolean);
+          candidate.cardSeq=candidate.cardSeq||1;
+          candidate.skin={...SKIN_DEF,...(candidate.skin||{})};
+          candidate.skins=Array.isArray(candidate.skins)?candidate.skins:[];
+          candidate.sys=candidate.sys||{keepAlive:false,notify:false};
+          candidate.contacts.forEach((ct,i)=>{
+            ct.cfg={...DEF_CFG,...(ct.cfg||{})};ct.msgs=Array.isArray(ct.msgs)?ct.msgs:[];ct.letters=Array.isArray(ct.letters)?ct.letters:[];ct.moments=Array.isArray(ct.moments)?ct.moments:[];ct.momPending=Array.isArray(ct.momPending)?ct.momPending:[];ct.momUnread=ct.momUnread||0;ct.momPlan=ct.momPlan||null;ct.momDay=ct.momDay||{day:'',count:0};ct.profile={name:'联系人',avatar:'',myAvatar:'',bg:'',myName:'我',...(ct.profile||{})};delete ct.status;ct.sel=Array.isArray(ct.sel)?ct.sel:candidate.groups.map(g=>g.id);
+          });
+          const audio=(d.audio||[]).map(a=>{if(!a||!a.id||typeof a.data!=='string')throw Error('音频文件数据不完整');return {key:'mus'+a.id,blob:dataURLToBlob(a.data)}});
+          // 先写入资源，最后才提交主状态；任何前置失败都不会替换现有状态。
+          for(let i=0;i<audio.length;i++){if(!await kv.set(audio[i].key,audio[i].blob))throw Error('本地音频写入失败');if(i%2===0)await new Promise(r=>setTimeout(r,0))}
+          const saved=await kv.set('state',candidate);if(!saved)throw Error('无法写入本地数据库，当前数据未替换');
+          Object.keys(G).forEach(k=>delete G[k]);Object.assign(G,candidate);
+          G.cur=null;V.q='';V.type='all';V.group='all';V.multi=false;V.sel.clear();applySkin();view='list';closePop();closePP();$('list').hidden=false;['cardsPage','cfgPage'].forEach(i=>{const e=$(i);if(e)e.hidden=true});
+          booted=true;try{localStorage.setItem('zk4_lite',JSON.stringify({contacts:G.contacts.map(c=>({id:c.id,profile:{...c.profile,avatar:'',myAvatar:'',bg:'',callBg:'',momCover:''},cfg:c.cfg,sel:c.sel}))}))}catch(e){}
+          await new Promise(r=>setTimeout(r,0));renderList();toast('完整备份导入成功');
+        }catch(e){console.error(e);toast('导入失败，当前页面数据未替换：'+(e.message||'未知错误'))}
+      },'确认导入');
+    }).catch(e=>{console.error(e);toast('备份读取失败，未更改现有数据：'+(e.message||'文件无效'))});
+  };f.click();
 }
 
 
@@ -2625,16 +2660,16 @@ $('more').onclick=()=>menuCard(S.profile.name,[
   [ICO.cards,'选用字卡分组','对方用哪些分组的字卡来回复',()=>selDlg(cur())],
   [ICO.image,'更换聊天背景','设置聊天背景图',()=>$('pickBg').onclick()],
   [ICO.restore,'恢复默认背景','回到纯色背景',()=>$('rstBg').onclick()],
-  [ICO.restore,'导出完整备份','保存聊天记录、字卡、装扮与设置',()=>exportFullBackup()],
-  [ICO.restore,'导入完整备份','从 JSON 恢复整个网站数据',()=>importFullBackup()],
+  [ICO.restore,'导出完整备份','保存用户数据、内嵌图片及本地音乐（不含网站源码）',()=>exportFullBackup()],
+  [ICO.restore,'导入完整备份','从完整备份恢复用户数据与本地资源（兼容旧版）',()=>importFullBackup()],
   [ICO.trash,'清空聊天记录','只删除当前消息',()=>$('clr').onclick(),true]
 ]);
 $('lAdd').onclick=contactDlg;
 $('lCards').onclick=()=>openCards();
 $('lMore').onclick=()=>menuCard('更多',[
   [ICO.cards,'字卡库','分组、搜索、导入/导出字卡',()=>openCards()],
-  [ICO.restore,'导出完整备份','保存聊天记录、字卡、装扮与设置',()=>exportFullBackup()],
-  [ICO.restore,'导入完整备份','从 JSON 恢复整个网站数据',()=>importFullBackup()],
+  [ICO.restore,'导出完整备份','保存用户数据、内嵌图片及本地音乐（不含网站源码）',()=>exportFullBackup()],
+  [ICO.restore,'导入完整备份','从完整备份恢复用户数据与本地资源（兼容旧版）',()=>importFullBackup()],
   [ICO.image,'装扮','自定义气泡、导入气泡代码',()=>skinDlg()],
   [ICO.restore,'后台保活与通知','锁屏保活、消息弹窗',()=>modal('后台保活与通知',b=>bgTab(b),[['完成',null,'primary']])]
 ]);
