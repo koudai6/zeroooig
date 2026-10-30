@@ -1147,7 +1147,7 @@ header{padding-right:10px!important}
   <footer class="bar">
     <button class="plus" id="plus" aria-label="更多功能"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6l6 6-6 6M12 6l6 6-6 6"/></svg></button>
     <div class="field">
-      <textarea id="ta" rows="1" placeholder="输入消息" enterkeyhint="send"></textarea>
+      <textarea id="ta" rows="1" placeholder="输入消息" enterkeyhint="send" inputmode="text" autocapitalize="sentences" autocomplete="off" spellcheck="true"></textarea>
       <button class="act" id="stk" aria-label="表情包"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#8e8e93" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 0-8 8c4.4 0 8-3.6 8-8z"/><path d="M20 12h-4a4 4 0 0 0-4 4v4"/><path d="M9 10h.01M15 10h.01"/></svg></button>
       <button class="act" id="cam" aria-label="图片"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#8e8e93" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.6-2.4h6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.6"/></svg></button>
     </div>
@@ -1975,11 +1975,15 @@ function bgTab(body){
 }
 
 
-/* iOS 18 主屏幕模式：确保输入框真实获得焦点，键盘弹出时由 visualViewport 更新布局 */
+/* iOS 18 主屏幕模式：在可信的 touchstart/pointerdown 同步聚焦，不能等 touchend 后再补焦点 */
 (()=>{
- const input=$('ta'); if(!input)return;
- input.addEventListener('touchend',()=>{if(document.activeElement!==input){try{input.focus({preventScroll:true})}catch(_){input.focus()}}},{passive:true});
- input.addEventListener('focus',()=>{setTimeout(()=>{if(window.relayout)window.relayout();try{input.scrollIntoView({block:'nearest',behavior:'auto'})}catch(_){}},80)});
+ const input=document.getElementById('ta'); if(!input)return;
+ const focusNow=()=>{ if(document.activeElement!==input){ try{input.focus({preventScroll:true});}catch(_){input.focus();} } };
+ input.addEventListener('touchstart',focusNow,{capture:true,passive:true});
+ input.addEventListener('pointerdown',focusNow,{capture:true,passive:true});
+ input.addEventListener('focus',()=>{
+   requestAnimationFrame(()=>{ if(window.relayout)window.relayout(); });
+ });
 })();
 
 /* ========== 锁屏：键盘弹出也不让页面晃动，禁止双指缩放 ========== */
@@ -3107,16 +3111,6 @@ $('ltT').onclick=()=>{const s=sg();if(!s)return;let a,b2;
 /* 键盘弹出时让输入框保持真实焦点；不调用 scrollIntoView，避免 iOS PWA 视口二次偏移 */
 #ta{pointer-events:auto!important;touch-action:manipulation!important;-webkit-user-select:text!important;user-select:text!important}
 </style>
-<script id="ios18-input-focus-fix">
-(()=>{const ta=document.getElementById('ta');if(!ta)return;
- const focus=()=>{if(document.activeElement!==ta){try{ta.focus({preventScroll:true})}catch(_){ta.focus()}}};
- ta.addEventListener('pointerdown',focus,{passive:true});
- ta.addEventListener('touchend',focus,{passive:true});
- ta.addEventListener('click',focus);
- ta.addEventListener('focus',()=>{requestAnimationFrame(()=>{if(window.relayout)window.relayout();const c=document.getElementById('chat');if(c)setTimeout(()=>{c.scrollTop=c.scrollHeight},80)})});
-})();
-</script>
-
 </body>
 </html>
 
@@ -3292,5 +3286,25 @@ html,body{overscroll-behavior:none}
    const update=()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;if(document.activeElement===ta&&window.relayout)window.relayout();});};
    visualViewport.addEventListener('resize',update);
  }
+})();
+</script>
+
+<style id="ios18-keyboard-repair-v2">
+/* 主屏幕 PWA：输入区域必须可接收原生触摸，避免被 fixed 聊天层或装饰层挡住 */
+.bar{position:relative!important;z-index:30!important;flex:none!important;isolation:isolate}
+.field{position:relative!important;z-index:31!important;min-height:44px!important;pointer-events:auto!important}
+#ta{position:relative!important;z-index:32!important;display:block!important;flex:1 1 auto!important;min-width:0!important;min-height:40px!important;height:40px!important;max-height:120px!important;pointer-events:auto!important;touch-action:auto!important;-webkit-user-select:text!important;user-select:text!important;-webkit-appearance:none!important;opacity:1!important}
+#ta:focus{outline:none!important}
+@media(display-mode:standalone){.bar{padding-bottom:max(4px,env(safe-area-inset-bottom))!important}}
+</style>
+<script id="ios18-keyboard-repair-v2-script">
+(()=>{
+ const input=document.getElementById('ta'); if(!input)return;
+ // Only focus synchronously from a real user gesture. Never refocus on touchend/click.
+ const nativeFocus=()=>{ if(document.activeElement!==input){try{input.focus({preventScroll:true})}catch(_){input.focus()}} };
+ input.addEventListener('touchstart',nativeFocus,{capture:true,passive:true});
+ input.addEventListener('pointerdown',nativeFocus,{capture:true,passive:true});
+ const vv=window.visualViewport;
+ if(vv){let raf=0;const update=()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;if(document.activeElement===input&&window.relayout)window.relayout()})};vv.addEventListener('resize',update);vv.addEventListener('scroll',update)}
 })();
 </script>
