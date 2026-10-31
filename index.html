@@ -2077,14 +2077,12 @@ function bgTab(body){
       /* 以网页实际可绘制的高度为准（iOS 主屏幕模式下它可能比屏幕矮一截，矮的那一截网页画不到） */
       const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone;
       const sh=innerWidth<=innerHeight?screen.height:screen.width;
-      let H=Math.max(innerHeight,Math.round(probe.getBoundingClientRect().height));
-      const gap0=standalone?sh-H:0,filled=gap0>20&&gap0<120;
-      if(filled)H=sh;
+      const H=Math.max(innerHeight,Math.round(probe.getBoundingClientRect().height));
       if(H!==fullH){fullH=H;document.documentElement.style.setProperty('--H',H+'px')}
       document.body.style.height=H+'px';document.body.style.bottom='auto';document.documentElement.style.height=H+'px';
       /* 网页底边离屏幕底边还有一段距离时，底部安全区已经不在网页里，不再额外留白 */
       const gap=standalone?sh-H:0,man=G.sys&&G.sys.bottomPad;
-      const val=(typeof man==='number')?man:(filled?34:(gap>20?0:null));
+      const val=(typeof man==='number')?man:(gap>20?0:null);
       document.documentElement.style.setProperty('--sab',val!=null?val+'px':'env(safe-area-inset-bottom)');
     }
     const h=kb?Math.max(240,Math.round(vv.height)):fullH;
