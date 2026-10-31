@@ -1355,7 +1355,7 @@ function render(keep){
     if(!nx2||nx2.type==='pat'||nx2.type==='call'||nx2.mine!==m.mine||new Date(nx2.t).toDateString()!==dk)r.classList.add('last');
     if(first)c.append(grpHead(m.mine,m.t));
     if(m.reply)c.append(qLine(m));
-    if(m.mine&&m.read)r.append(h('span','seen','seen'));
+    if(m.mine&&m.read&&i===lastMine){const sn=h('span','seen');sn.innerHTML=CK2;sn.setAttribute('aria-label','已读');r.append(sn)}
     r.append(e);c.append(r);
   }
   if(rt(ct).typing){c.append(grpHead(false,Date.now()));const r=h('div','r theirs first last'),d=h('div','m dots');d.innerHTML='<i></i><i></i><i></i>';r.append(d);c.append(r)}
@@ -2375,7 +2375,7 @@ function skinDlg(){
         mk('导入字体文件（TTF / OTF / WOFF）','',()=>pickFont(draw));
         if(k.fontName)mk('使用已导入的字体'+(k.fontName?'：'+k.fontName:''),fm==='user'?'primary':'',async()=>{if(await loadUserFont()){k.font='user';upd();draw()}else toast('没有找到已导入的字体，请重新导入')});
         mk('恢复系统字体',fm==='system'?'primary':'',()=>{k.font='system';upd();draw()});
-        b.append(h('div','hint','字体文件会保存在本机浏览器里（不进备份），导入大字体后首次显示可能稍慢。'))}
+        b.append(h('div','hint','字体文件会保存在本机浏览器里，并包含在完整备份中，导入大字体后首次显示可能稍慢。'))}
       b.append(h('div','hint','自定义气泡'));
       col('bm','--bm','我的气泡颜色');col('bmc','--bmc','我的文字颜色');col('bt','--bt','对方气泡颜色');col('btc','--btc','对方文字颜色');
       {const cur=k.rad!=null?k.rad:(k.br>0?k.br:DEF_RAD),i=h('input'),val=h('span','',cur===0?'0（方形）':String(cur));
@@ -2749,7 +2749,9 @@ async function exportFullBackup(){
       const song=songs[i];if(song&&song.kind==='file'&&song.id){const blob=await kv.get('mus'+song.id);if(blob){audio.push({id:song.id,name:song.title||'本地音频',type:blob.type||'application/octet-stream',data:await blobToDataURL(blob)})}else song.assetMissing=true}
       if(i%3===0)await new Promise(r=>setTimeout(r,0));
     }
-    const data={format:'chat-full-backup',version:2,exportedAt:new Date().toISOString(),includes:['应用内用户数据','已嵌入的图片/表情/头像/背景','本地导入音频'],excludes:['网站程序源码与部署文件','服务器端资源与外部链接内容'],state,audio};
+    let font=null;
+    try{const fb=await kv.get('userfont');if(fb)font={name:state.skin&&state.skin.fontName||'自定义字体',data:await blobToDataURL(new Blob([fb]))}}catch(e){}
+    const data={format:'chat-full-backup',version:3,exportedAt:new Date().toISOString(),includes:['全部聊天记录（含转账）','联系人、字卡库、设置、装扮','已嵌入的图片/表情/头像/背景/语音','本地导入音频','导入的自定义字体'],excludes:['网站程序源码与部署文件','服务器端资源与外部链接内容'],state,audio,font};
     downloadJSON(data,'聊天网站完整备份_'+new Date().toISOString().slice(0,10)+'.json');
     toast('完整备份已导出'+(audio.length?'（含 '+audio.length+' 个本地音频）':''));
   }catch(e){console.error(e);toast('备份导出失败：'+(e.message||'资源读取错误'))}
@@ -2780,6 +2782,7 @@ function importFullBackup(){
           const audio=(d.audio||[]).map(a=>{if(!a||!a.id||typeof a.data!=='string')throw Error('音频文件数据不完整');return {key:'mus'+a.id,blob:dataURLToBlob(a.data)}});
           // 先写入资源，最后才提交主状态；任何前置失败都不会替换现有状态。
           for(let i=0;i<audio.length;i++){if(!await kv.set(audio[i].key,audio[i].blob))throw Error('本地音频写入失败');if(i%2===0)await new Promise(r=>setTimeout(r,0))}
+          if(d.font&&typeof d.font.data==='string'){const ab=await dataURLToBlob(d.font.data).arrayBuffer();if(!await kv.set('userfont',ab))throw Error('字体写入失败');userFam=''}
           const saved=await kv.set('state',candidate);if(!saved)throw Error('无法写入本地数据库，当前数据未替换');
           Object.keys(G).forEach(k=>delete G[k]);Object.assign(G,candidate);
           G.cur=null;V.q='';V.type='all';V.group='all';V.multi=false;V.sel.clear();applySkin();view='list';closePop();closePP();$('list').hidden=false;['cardsPage','cfgPage'].forEach(i=>{const e=$(i);if(e)e.hidden=true});
@@ -2872,7 +2875,7 @@ $('more').onclick=()=>menuCard(S.profile.name,[
   [ICO.cards,'选用字卡分组','对方用哪些分组的字卡来回复',()=>selDlg(cur())],
   [ICO.image,'更换聊天背景','设置聊天背景图',()=>$('pickBg').onclick()],
   [ICO.restore,'恢复默认背景','回到纯色背景',()=>$('rstBg').onclick()],
-  [ICO.restore,'导出完整备份','保存用户数据、内嵌图片及本地音乐（不含网站源码）',()=>exportFullBackup()],
+  [ICO.restore,'导出完整备份','保存全部用户数据、聊天记录、图片、音乐及字体（不含网站源码）',()=>exportFullBackup()],
   [ICO.restore,'导入完整备份','从完整备份恢复用户数据与本地资源（兼容旧版）',()=>importFullBackup()],
   [ICO.trash,'清空聊天记录','只删除当前消息',()=>$('clr').onclick(),true]
 ]);
@@ -2880,7 +2883,7 @@ $('lAdd').onclick=contactDlg;
 $('lCards').onclick=()=>openCards();
 $('lMore').onclick=()=>menuCard('更多',[
   [ICO.cards,'字卡库','分组、搜索、导入/导出字卡',()=>openCards()],
-  [ICO.restore,'导出完整备份','保存用户数据、内嵌图片及本地音乐（不含网站源码）',()=>exportFullBackup()],
+  [ICO.restore,'导出完整备份','保存全部用户数据、聊天记录、图片、音乐及字体（不含网站源码）',()=>exportFullBackup()],
   [ICO.restore,'导入完整备份','从完整备份恢复用户数据与本地资源（兼容旧版）',()=>importFullBackup()],
   [ICO.image,'装扮','自定义气泡、导入气泡代码',()=>skinDlg()],
   [ICO.restore,'后台保活与通知','锁屏保活、消息弹窗',()=>modal('后台保活与通知',b=>bgTab(b),[['完成',null,'primary']])]
@@ -3777,7 +3780,8 @@ html,body{overscroll-behavior:none}
   .r .m.pay.xfer.accepted .xf-ic,.r .m.pay.xfer.rejected .xf-ic{background:#6b6b70}
 }
 /* ===== seen：我方已读消息，气泡左边 ===== */
-.r .seen{flex:none;align-self:flex-end;margin:0 6px 3px 0;font-size:10px;line-height:12px;letter-spacing:.2px;color:var(--mute);opacity:.8;-webkit-user-select:none;user-select:none;white-space:nowrap}
+.r .seen{flex:none;align-self:flex-end;display:inline-flex;margin:0 5px 4px 0;color:#9b9ba1;-webkit-user-select:none;user-select:none}
+.r .seen svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 /* ===== 弹窗：标题栏带关闭键，底部按钮固定，内容区单独滚动 ===== */
 #modal .panel{padding:0!important;gap:0!important;overflow:hidden!important;display:flex;flex-direction:column}
 #modal .panel h2{flex:none;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 14px 10px 20px!important}
