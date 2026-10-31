@@ -13,7 +13,7 @@
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-touch-fullscreen" content="yes">
 <title>字卡聊天</title>
 <style>
@@ -1260,6 +1260,8 @@ header{padding-right:10px!important}
 .lt-who{margin-top:8px;font-size:13px;color:var(--mute)}
 .lt-disc{margin:auto 0;width:min(66vw,260px);aspect-ratio:1;border-radius:50%;display:grid;place-items:center;background:repeating-radial-gradient(#111 0 2px,#1c1c1e 2px 4px);box-shadow:0 14px 40px rgba(0,0,0,.28);animation:ltspin 18s linear infinite;animation-play-state:paused}
 .playing .lt-disc,.lm-on .lm-cv{animation-play-state:running}
+.lt-disc{cursor:pointer;transition:opacity .25s}
+.lt-nodisc .lt-disc{opacity:0;box-shadow:none}
 .lt-cv,.lm-cv{overflow:hidden;display:grid;place-items:center;color:#fff;background:#3a3a3c;border-radius:50%}
 .lt-cv{width:62%;aspect-ratio:1}
 .lt-cv img,.lm-cv img{width:100%;height:100%;object-fit:cover}
@@ -2082,7 +2084,7 @@ function bgTab(body){
       document.body.style.height=H+'px';document.body.style.bottom='auto';document.documentElement.style.height=H+'px';
       /* 网页底边离屏幕底边还有一段距离时，底部安全区已经不在网页里，不再额外留白 */
       const gap=standalone?sh-H:0,man=G.sys&&G.sys.bottomPad;
-      const val=(typeof man==='number')?man:(gap>20?0:null);
+      const val=(typeof man==='number')?man:null;
       document.documentElement.style.setProperty('--sab',val!=null?val+'px':'env(safe-area-inset-bottom)');
     }
     const h=kb?Math.max(240,Math.round(vv.height)):fullH;
@@ -3203,6 +3205,9 @@ function ltPaint(){
   fillAv($('ltA'),pf.avatar);fillAv($('ltB'),pf.myAvatar);
   $('ltWho').textContent=(pf.name||'对方')+' & '+(pf.myName||'我')+(lt.on?' · 正在一起听':'');
   coverTo($('ltCv'),s);coverTo($('lmCv'),s);
+  const dc=G.listen.disc||{};
+  if(dc.img){const cv=$('ltCv');cv.innerHTML='';const im=document.createElement('img');im.src=dc.img;cv.append(im)}
+  lp.classList.toggle('lt-nodisc',!!dc.hide);
   $('ltT').textContent=s?s.title:'还没有歌曲';$('ltAr').textContent=s?(s.artist||'点标题可编辑歌曲信息'):'点左下角 + 导入音乐链接';
   const bg=G.listen.bg||'';document.querySelector('#lt .lt-bg').style.backgroundImage=bg?'url("'+bg+'")':(s&&s.cover?'url("'+s.cover+'")':'');lp.classList.toggle('lt-custom-bg',!!bg);
   $('ltPlay').innerHTML=$('lmP').innerHTML=pl?IC2.pause:IC2.play;
@@ -3316,6 +3321,16 @@ function listDlg(){
 $('ltBg').onclick=()=>modal('一起听背景',b=>{
   b.append(h('div','hint','选择一张图片作为一起听界面的背景。背景只保存在当前浏览器。'));
 },[['取消'],['恢复默认',()=>{G.listen.bg='';save();ltPaint();toast('已恢复默认背景')}],['选择图片',()=>pickFile(1800,.86,u=>{G.listen.bg=u;save();ltPaint();toast('背景已更换') }),'primary']]);
+function discDlg(){
+  const dc=G.listen.disc||(G.listen.disc={hide:false,img:''});
+  modal('唱片',b=>{
+    const mk=(t,fn)=>{const x=h('button','bgbtn',t);x.onclick=()=>{$('modal').hidden=true;fn()};b.append(x)};
+    mk(dc.hide?'显示唱片':'隐藏唱片，露出大背景',()=>{dc.hide=!dc.hide;save();ltPaint();toast(dc.hide?'已隐藏唱片，点一下屏幕中间可再打开':'已显示唱片')});
+    mk('更换唱片中心图片',()=>pickFile(600,.85,u=>{dc.img=u;dc.hide=false;save();ltPaint();toast('唱片已更换')}));
+    mk('恢复默认唱片',()=>{dc.img='';dc.hide=false;save();ltPaint();toast('已恢复默认唱片')});
+  },[['完成',null,'primary']]);
+}
+lp.querySelector('.lt-disc').onclick=discDlg;
 $('ltAdd').onclick=addDlg;$('ltList').onclick=listDlg;
 $('ltT').onclick=()=>{const s=sg();if(!s)return;let a,b2;
   modal('编辑歌曲',b=>{a=h('input');a.value=s.title;a.placeholder='歌名';b2=h('input');b2.value=s.artist;b2.placeholder='歌手';b2.style.marginTop='8px';
